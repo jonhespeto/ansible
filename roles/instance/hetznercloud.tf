@@ -105,6 +105,6 @@ output "server_ip_ubuntu20" {
 resource "null_resource" "run_ansible_destroy" {
   provisioner "local-exec" {
     when    = destroy
-    command = "ansible-playbook  --ask-vault-pass destroy.yml"
+    command = "ansible-playbook --ask-vault-pass destroy.yml"
   }
 }
