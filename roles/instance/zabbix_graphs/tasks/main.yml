@@ -1,0 +1,155 @@
+---
+- name: Login to Zabbix
+  uri:
+    url: "http://{{ zabbix_web }}/api_jsonrpc.php"
+    method: POST
+    validate_certs: false
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "user.login"
+      params:
+        user: "{{ user }}"
+        password: "{{ password_zabbix }}"
+      id: 1
+  register: zabbix_login
+
+- set_fact:
+    node_names: "{{ groups[host_group_name] }}"
+
+- name: Get hostids by name
+  uri:
+    url: "http://{{ zabbix_web }}/api_jsonrpc.php"
+    method: POST
+    validate_certs: false
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "host.get"
+      params:
+        output: ["hostid"]
+        filter:
+          host: "{{ item }}"
+        selectGroups: "extend"
+      auth: "{{ zabbix_login.json.result }}"
+      id: 2
+  register: zabbix_host
+  loop: "{{ node_names }}"
+  loop_control:
+    loop_var: item
+
+- set_fact:
+    zabbix_host_ids: "{{ zabbix_host_ids | default([]) + [item.json.result[0].hostid] }}"
+  loop: "{{ zabbix_host.results }}"
+  loop_control:
+    loop_var: item
+
+- name: Get itemids system uptime
+  uri:
+    url: "http://{{ zabbix_web }}/api_jsonrpc.php"
+    method: POST
+    validate_certs: false
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "item.get"
+      params:
+        output: ["itemid"]
+        hostids: "{{ item.json.result[0].hostid }}"
+        filter:
+          name: "System uptime"
+      auth: "{{ zabbix_login.json.result }}"
+      id: 3
+  register: zabbix_item_uptime
+  loop: "{{ zabbix_host.results }}"
+  loop_control:
+    loop_var: item
+
+- set_fact:
+    zabbix_item_ids_uptime: "{{ zabbix_item_ids_uptime|default([]) + [item.json.result[0].itemid] }}"
+  loop: "{{ zabbix_item_uptime.results }}"
+  loop_control:
+    loop_var: item
+
+- name: Get itemids space utilization
+  uri:
+    url: "http://{{ zabbix_web }}/api_jsonrpc.php"
+    method: POST
+    validate_certs: false
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "item.get"
+      params:
+        output: ["itemid"]
+        hostids: "{{ item.json.result[0].hostid }}"
+        filter:
+          name: "/: Space utilization"
+      auth: "{{ zabbix_login.json.result }}"
+      id: 4
+  register: zabbix_item_space
+  loop: "{{ zabbix_host.results }}"
+  loop_control:
+    loop_var: item
+
+- set_fact:
+    zabbix_item_ids_space: "{{ zabbix_item_ids_space|default([]) + [item.json.result[0].itemid|int] }}"
+  loop: "{{ zabbix_item_space.results }}"
+  loop_control:
+    loop_var: item
+
+- name: Get itemids used space
+  uri:
+    url: "http://{{ zabbix_web }}/api_jsonrpc.php"
+    method: POST
+    validate_certs: false
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "item.get"
+      params:
+        output: ["itemid"]
+        hostids: "{{ item.json.result[0].hostid }}"
+        filter:
+          name: "/: Used space"
+      auth: "{{ zabbix_login.json.result }}"
+      id: 5
+  register: zabbix_item_used_space
+  loop: "{{ zabbix_host.results }}"
+  loop_control:
+    loop_var: item
+
+- set_fact:
+    zabbix_item_ids_used_space: "{{ zabbix_item_ids_used_space|default([]) + [item.json.result[0].itemid|int] }}"
+  loop: "{{ zabbix_item_used_space.results }}"
+  loop_control:
+    loop_var: item
+
+- name: Generate widget file
+  template:
+    src: "{{ role_path }}/templates/graph_widget.j2"
+    dest: "{{ role_path }}/templates/file.json"
+  vars:
+    zabbix_item_ids: "{{ zabbix_item_ids }}"
+
+- name: Read Widget File
+  slurp:
+    path: "{{ role_path }}/templates/file.json"
+  register: widget_content
+
+- name: Create Dashboard
+  uri:
+    url: "http://{{ zabbix_web }}/api_jsonrpc.php"
+    method: POST
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "dashboard.create"
+      params:
+        name: "{{ host_group_name }}"
+        display_period: 30
+        auto_start: 1
+        pages:
+          - widgets: "{{ widget_content['content'] | b64decode }}"
+      auth: "{{ zabbix_login.json.result }}"
+      id: 1

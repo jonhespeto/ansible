@@ -1,0 +1,289 @@
+[
+  {% for item in node_names %}
+  {
+    "type": "svggraph",
+    "name": "{{ item }}",
+    "x": "0",
+    "y": {{ loop.index0 * 5 }},
+    "width": 18,
+    "height": 5,
+    "view_mode": 0,
+    "fields": [
+      {
+          "name": "ds.hosts.0.0",
+          "type": "1",
+          "value": "{{ item }}"
+      },
+      {
+          "name": "ds.color.0",
+          "type": "1",
+          "value": "00FFFF"
+      },
+      {
+          "name": "righty_min",
+          "type": "1",
+          "value": "0"
+      },
+      {
+          "name": "righty_max",
+          "type": "1",
+          "value": "100"
+      },
+      {
+          "name": "ds.axisy.0",
+          "type": "0",
+          "value": "1"
+      },
+      {
+          "name": "ds.axisy.1",
+          "type": "0",
+          "value": "1"
+      },
+      {
+          "name": "ds.fill.0",
+          "type": "0",
+          "value": "4"
+      },
+      {
+          "name": "ds.width.0",
+          "type": "0",
+          "value": "2"
+      },
+      {
+          "name": "graph_time",
+          "type": "0",
+          "value": "1"
+      },
+      {
+          "name": "time_from",
+          "type": "1",
+          "value": "now-10h"
+      },
+      {
+          "name": "legend_statistic",
+          "type": "0",
+          "value": "1"
+      },
+      {
+          "name": "legend_lines",
+          "type": "0",
+          "value": "3"
+      },
+      {
+          "name": "severities",
+          "type": "0",
+          "value": "2"
+      },
+      {
+          "name": "ds.items.0.0",
+          "type": "1",
+          "value": "Memory utilization"
+      },
+      {
+          "name": "ds.transparency.0",
+          "type": "0",
+          "value": "0"
+      },
+      {
+          "name": "ds.hosts.1.0",
+          "type": "1",
+          "value": "{{ item }}"
+      },
+      {
+          "name": "ds.items.1.0",
+          "type": "1",
+          "value": "CPU utilization"
+      },
+      {
+          "name": "ds.color.1",
+          "type": "1",
+          "value": "AED581"
+      },
+      {
+          "name": "ds.width.1",
+          "type": "0",
+          "value": "2"
+      },
+      {
+          "name": "ds.transparency.1",
+          "type": "0",
+          "value": "0"
+      },
+      {
+          "name": "ds.fill.1",
+          "type": "0",
+          "value": "2"
+      },
+      {
+          "name": "lefty",
+          "type": "0",
+          "value": "0"
+      }
+    ]
+  },
+  {
+    "fields": [
+      {
+        "name": "itemid",
+        "type": "4",
+        "value": "{{ zabbix_item_ids_uptime[loop.index0] }}"
+      },
+      {
+        "name": "adv_conf",
+        "type": "0",
+        "value": "1"
+      },
+      {
+        "name": "decimal_size",
+        "type": "0",
+        "value": "25"
+      },
+      {
+        "name": "value_size",
+        "type": "0",
+        "value": "35"
+      },
+      {
+        "name": "value_color",
+        "type": "1",
+        "value": "00FFFF"
+      }
+    ],
+    "height": "2",
+    "name": "uptime",
+    "type": "item",
+    "view_mode": "0",
+    "width": "3",
+    "x": "18",
+    "y": {{ loop.index0 * 5 }}
+    },
+      {
+    "fields": [
+      {
+        "name": "itemid",
+        "type": "4",
+        "value": "{{ zabbix_item_ids_used_space[loop.index0] }}"
+      },
+      {
+        "name": "show",
+        "type": "0",
+        "value": "2"
+      },
+      {
+        "name": "adv_conf",
+        "type": "0",
+        "value": "1"
+      },
+      {
+        "name": "value_color",
+        "type": "1",
+        "value": "E57373"
+      },
+      {
+        "name": "units_color",
+        "type": "1",
+        "value": "C5E1A5"
+      }
+    ],
+    "height": "2",
+    "name": "Used space",
+    "type": "item",
+    "view_mode": "0",
+    "width": "3",
+    "x": "21",
+    "y": {{ loop.index0 * 5 }}
+  },
+  {
+    "fields": [
+      {
+        "type": "4",
+        "name": "itemid",
+        "value": "{{ zabbix_item_ids_space[loop.index0] }}"
+      },
+      {
+        "name": "show",
+        "type": "0",
+        "value": "2"
+      },
+      {
+        "name": "show",
+        "type": "0",
+        "value": "4"
+      },
+      {
+        "name": "adv_conf",
+        "type": "0",
+        "value": "1"
+      },
+      {
+        "name": "value_color",
+        "type": "1",
+        "value": "FFAB91"
+      },
+      {
+        "name": "units_color",
+        "type": "1",
+        "value": "FF5722"
+      }
+    ],
+    "height": "3",
+    "name": "Utilization space",
+    "type": "item",
+    "view_mode": "0",
+    "width": "3",
+    "x": "21",
+    "y": {{ loop.index0 * 5 + 2 }}
+    },
+    {
+    "fields": [
+      {
+        "name": "hostids",
+        "type": "3",
+        "value": "{{ zabbix_host_ids[loop.index0] }}"
+      },
+      {
+        "name": "severities",
+        "type": "0",
+        "value": "2"
+      },
+      {
+        "name": "severities",
+        "type": "0",
+        "value": "3"
+      },
+      {
+        "name": "severities",
+        "type": "0",
+        "value": "4"
+      },
+      {
+        "name": "severities",
+        "type": "0",
+        "value": "5"
+      },
+      {
+        "name": "show_type",
+        "type": "0",
+        "value": "1"
+      },
+      {
+        "name": "layout",
+        "type": "0",
+        "value": "1"
+      },
+      {
+        "name": "show_opdata",
+        "type": "0",
+        "value": "1"
+      }
+    ],
+    "height": "3",
+    "name": "",
+    "type": "problemsbysv",
+    "view_mode": "0",
+    "width": "3",
+    "x": "18",
+    "y": {{ loop.index0 * 5 + 2 }}
+  }{{ "," if not loop.last else "" }}
+ {% endfor %}
+]
