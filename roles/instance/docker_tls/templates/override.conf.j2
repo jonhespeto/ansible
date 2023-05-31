@@ -1,0 +1,3 @@
+[Service]
+ExecStart=
+ExecStart=/usr/bin/dockerd -D -H unix:///var/run/docker.sock --tlsverify --tlscert=/home/{{ new_user }}/.certs/server-cert.pem --tlscacert=/home/{{ new_user }}/.certs/ca.pem --tlskey=/home/{{ new_user }}/.certs/server-key.pem -H tcp://0.0.0.0:{{ ansible_docker_port }}

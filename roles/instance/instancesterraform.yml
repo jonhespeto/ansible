@@ -1,0 +1,80 @@
+- name: Run add_user role
+  hosts: "{{ host_group_name }}"
+  gather_facts: false
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/vars.yml"
+  tasks:
+    - name: Wait for SSH port to be available
+      wait_for_connection:
+        timeout: 120
+        delay: 5
+      vars:
+         ansible_ssh_port: 22
+         ansible_user: root
+
+    - name: Import add_user role
+      import_role:
+        name: add_user
+      vars:
+          ansible_ssh_port: 22
+          ansible_user: root
+
+- name: run zabbix_agent and docker_tls role
+  hosts: "{{ host_group_name }}"
+  gather_facts: false
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/vars.yml"
+  tasks:
+    - name: Include zabbix_agent role
+      include_role:
+        name: zabbix_agent
+
+    - name: Include docker_tls role
+      include_role:
+        name: docker_tls
+
+- name: run add_environments roles
+  hosts: localhost
+  gather_facts: false
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/vars.yml"
+  tasks:
+    - name: Import add_user role
+      include_role:
+        name: add_environments
+
+- name: Allow Zabbix Agent access in UFW on zabbix_server
+  hosts: zabbix_server
+  gather_facts: false
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/vars.yml"
+  tasks:
+    - name: Wait for connection to server zabbix server
+      wait_for_connection:
+        timeout: 120
+        delay: 5
+      ignore_errors: yes
+
+    - name: Allow Zabbix Agent access in UFW on server zabbix server
+      ufw:
+        rule: allow
+        port: "{{ zabbix_server_port }}"
+        proto: tcp
+        from_ip: "{{ hostvars[item].ansible_host }}"
+        comment: "Allow Zabbix Agent access"
+      loop: "{{ groups[host_group_name] }}"
+      ignore_errors: yes
+
+- name: run zabbix_graphs role
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/vars.yml"
+  tasks:
+    - name: Import zabbix_graphs role
+      include_role:
+        name: zabbix_graphs

@@ -1,0 +1,140 @@
+- name: delete ufw rule on zabbix server
+  hosts: zabbix_server
+  gather_facts: false
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/add_environments/vars/main.yml"
+    - "{{ playbook_dir }}/vars.yml"
+  tasks:
+    - name: Remove Zabbix Agent access in UFW
+      shell: ufw delete allow from "{{ hostvars[item].ansible_host }}" to any port "{{ zabbix_server_port }}" proto tcp
+      loop: "{{ groups[host_group] }}"
+      ignore_errors: yes
+
+
+- name: destroy
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - "{{ playbook_dir }}/add_environments/vars/main.yml"
+    - "{{ playbook_dir }}/vars.yml"
+  tasks:
+    - name: Create JWT token
+      shell: >
+        curl -X POST -k -H "Content-Type: application/json" -d '{"Username":"{{ user }}","Password":"{{ password }}"}' https://"{{ portainer_server }}"/api/auth
+      register: response
+
+    - name: set JWT token var
+      set_fact:
+        jwt_token: "{{ response.stdout | from_json | json_query('jwt') }}"
+
+    - name: Get IP addresses from hosts group
+      set_fact:
+        hosts: "{{ groups[host_group] }}"
+
+    - name: Include id variables
+      include_vars:
+        file: "{{ playbook_dir }}/add_environments/vars/main.yml"
+      loop_control:
+        loop_var: id_var
+
+    - name: Delete Environment in Portainer
+      shell: >
+        curl -i -k -X DELETE -H "Authorization: {{ jwt_token }}" https://"{{ portainer_server }}"/api/endpoints/"{{ item }}"
+      loop: "{{ id | flatten }}"
+      ignore_errors: yes
+
+    - name: Delete directory certs
+      shell: "rm -rf /home/{{ user }}/docker_cert/{{ hostvars[item].ansible_host }}"
+      loop: "{{ groups[host_group] }}"
+      when: item in hostvars
+
+    - name: Login to Zabbix server web
+      uri:
+        url: "http://{{ zabbix_web }}/api_jsonrpc.php"
+        method: POST
+        validate_certs: false
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "user.login"
+          params:
+            user: "{{ user }}"
+            password: "{{ password_zabbix }}"
+          id: "1"
+          auth: null
+      register: zabbix_login
+      ignore_errors: yes
+
+    - name: Get dashboard ID by name
+      uri:
+        url: "http://{{ zabbix_web }}/api_jsonrpc.php"
+        method: POST
+        validate_certs: false
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "dashboard.get"
+          params:
+            output: ["dashboardid"]
+            filter:
+              name: "{{ host_group }}"
+          auth: "{{ zabbix_login.json.result }}"
+          id: "2"
+      register: get_response
+
+    - name: Delete dashboard by ID
+      uri:
+        url: "http://{{ zabbix_web }}/api_jsonrpc.php"
+        method: POST
+        validate_certs: false
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "dashboard.delete"
+          params:
+            - "{{ get_response.json.result[0].dashboardid }}"
+          auth: "{{ zabbix_login.json.result }}"
+          id: "3"
+      register: delete_response
+
+    - name: Get host IDs
+      uri:
+        url: "http://{{ zabbix_web }}/api_jsonrpc.php"
+        method: POST
+        validate_certs: false
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "host.get"
+          params:
+            output: ["hostid"]
+            filter:
+              name: "{{ item }}"
+          auth: "{{ zabbix_login.json.result }}"
+          id: "4"
+      register: host_ids
+      loop: "{{ groups[host_group] }}"
+      ignore_errors: yes
+
+    - name: Delete Zabbix hosts
+      uri:
+        url: "http://{{ zabbix_web }}/api_jsonrpc.php"
+        method: POST
+        body_format: json
+        body:
+          jsonrpc: "2.0"
+          method: "host.delete"
+          params:
+            hostids: "{{ item.json.result[0].hostid }}"
+          auth: "{{ zabbix_login.json.result }}"
+          id: "5"
+        validate_certs: no
+        return_content: yes
+      loop: "{{ host_ids.results }}"
+      when: item.json.result | length > 0
+      ignore_errors: yes
+
+    - name: Remove project directory
+      shell: rm -rf "{{ playbook_dir }}" &>/dev/null
+      ignore_errors: yes

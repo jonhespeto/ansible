@@ -1,0 +1,111 @@
+---
+- name: Update apt
+  apt:
+    update_cache: yes
+
+- name: Install package
+  apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: yes
+  loop:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - software-properties-common
+
+- name: Add Docker GPG key
+  shell: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+  args:
+    executable: /bin/bash
+
+- name: add repo Docker
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+    state: present
+- name: Update apt
+  apt:
+    update_cache: yes
+
+- name: Install Docker CE
+  apt:
+    name: docker-ce
+    state: present
+
+- name: Create dir .certs
+  file:
+    path: "/home/{{ new_user }}/.certs"
+    state: directory
+    owner: "{{ new_user }}"
+    group: "{{ new_user }}"
+    recurse: yes
+    follow: yes
+
+- name: Create dir docker_cert
+  file:
+    path: "/home/{{ new_user }}/docker_cert"
+    state: directory
+    owner: "{{ new_user }}"
+    group: "{{ new_user }}"
+    recurse: yes
+    follow: yes
+
+- name: Generate sertificate
+  shell: |
+    openssl genrsa -aes256 -passout pass:"{{ password_tls_docker }}" -out ca-key.pem 4096 2>/dev/null
+    openssl req -new -x509 -days 365 -passin pass:"{{ password_tls_docker }}" -key ca-key.pem -sha256 -out ca.pem \
+      -subj "/C=US/ST=State/L=City/O=Example Organization/OU=IT/CN=example.com/emailAddress=admin@example"
+    openssl genrsa -out server-key.pem 4096 2>/dev/null
+    openssl req -subj "/CN=ru.ru" -sha256 -new -key server-key.pem -out server.csr
+    echo "subjectAltName = DNS:ru.ru,IP:{{ ansible_host }},IP:127.0.0.1" >> extfile.cnf
+    echo "extendedKeyUsage = serverAuth" >> extfile.cnf
+    openssl x509 -req -days 365 -sha256 -in server.csr -CA ca.pem -CAkey ca-key.pem -passin pass:"{{ password_tls_docker }}" -CAcreateserial -out server-cert.pem -extfile extfile.cnf
+    openssl genrsa -out key.pem 4096 2>/dev/null
+    openssl req -subj '/CN=client' -new -key key.pem -out client.csr
+    echo "extendedKeyUsage = clientAuth" > extfile-client.cnf
+    openssl x509 -req -days 365 -sha256 -in client.csr -CA ca.pem -CAkey ca-key.pem -passin pass:"{{ password_tls_docker }}" -CAcreateserial -out cert.pem -extfile extfile-client.cnf
+    chmod -v 0400 ca-key.pem key.pem server-key.pem
+    chmod -v 0444 ca.pem server-cert.pem cert.pem
+    cp ca.pem server-cert.pem server-key.pem /home/"{{ new_user }}"/.certs
+    chown -f "{{ new_user }}":"{{ new_user }}" /home/"{{ new_user }}"/.certs/*
+    cp ca.pem cert.pem key.pem /home/"{{ new_user }}"/docker_cert
+    chown -f "{{ new_user }}":"{{ new_user }}" /home/"{{ new_user }}"/docker_cert/*
+  args:
+    executable: /bin/bash
+
+- name: Create docker.service.d directory
+  file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+
+- name: Configure the override.conf file
+  template:
+    src: override.conf.j2
+    dest: /etc/systemd/system/docker.service.d/override.conf
+
+- name: Docker daemon reload
+  systemd:
+    name: docker
+    state: restarted
+    daemon_reload: yes
+
+- name: Restart Docker Service
+  systemd:
+    name: docker.service
+    state: restarted
+
+- name: Allowing TCP port access via UFW
+  ufw:
+    rule: allow
+    proto: tcp
+    to_port: "{{ ansible_docker_port }}"
+
+- name: Download files from remote machine
+  fetch:
+    src: "/home/{{ new_user }}/docker_cert/{{ item }}"
+    dest: "/home/{{ user }}/docker_cert/{{ ansible_host }}/"
+    flat: yes
+  with_items:
+    - ca.pem
+    - cert.pem
+    - key.pem

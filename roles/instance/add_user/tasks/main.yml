@@ -1,0 +1,71 @@
+- name: Create user
+  user:
+    name: "{{ new_user }}"
+    password: "{{ new_password | password_hash('sha512', 'MySalt123') }}"
+    shell: /bin/bash
+    createhome: yes
+    home: "/home/{{ new_user }}"
+
+- name: Set new_user variable
+  set_fact:
+    new_user: "{{ new_user }}"
+
+- name: Add user to sudo group
+  user:
+    name: "{{ new_user }}"
+    groups: sudo
+    append: yes
+
+- name: Create SSH directory
+  file:
+    path: "/home/{{ new_user }}/.ssh"
+    state: directory
+    mode: "0700"
+    owner: "{{ new_user }}"
+    group: "{{ new_user }}"
+
+- name: Add SSH authorized key
+  authorized_key:
+    user: "{{ new_user }}"
+    key: "{{ ssh_public_key }}"
+    state: present
+
+- name: Backup current sshd_config
+  shell: cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+  changed_when: false
+
+- name: Copy new sshd_config template
+  template:
+    src: sshd_config.j2
+    dest: /etc/ssh/sshd_config
+    owner: "{{ new_user }}"
+    group: "{{ new_user }}"
+    mode: '0644'
+
+- name: Restart SSH service
+  service:
+    name: sshd
+    state: restarted
+
+- name: Install UFW
+  apt:
+    name: ufw
+    state: present
+
+- name: Add port ssh in ufw rules
+  ufw:
+    rule: allow
+    port: "{{ ssh_port }}"
+  async: 300
+  poll: 0
+
+- name: Check SSH connectivity
+  wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ ssh_port }}"
+    delay: 5
+    timeout: 30
+  become: true
+  remote_user: "{{ new_user }}"
+  vars:
+    ansible_port: "{{ ssh_port }}"

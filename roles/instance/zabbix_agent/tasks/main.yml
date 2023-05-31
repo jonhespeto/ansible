@@ -1,0 +1,98 @@
+---
+- name: Install net-tools and wget
+  apt:
+    state: present
+    name:
+      - net-tools
+      - wget
+
+- name: Wait for repository response
+  wait_for:
+    host: repo.zabbix.com
+    port: 443
+    state: started
+    timeout: 60
+
+- name: Check if Zabbix release package exists
+  stat:
+    path: "/tmp/zabbix-release_6.4-1+ubuntu20.04_all.deb"
+  register: zabbix_release_pkg
+
+- name: Wait for URL to be available
+  wait_for:
+    host: repo.zabbix.com
+    port: 443
+    state: started
+    delay: 5
+    timeout: 300
+  when: not zabbix_release_pkg.stat.exists
+
+- name: Download Zabbix release package
+  get_url:
+    url: "https://repo.zabbix.com/zabbix/6.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.4-1+ubuntu20.04_all.deb"
+    dest: "/tmp/zabbix-release_6.4-1+ubuntu20.04_all.deb"
+  when: not zabbix_release_pkg.stat.exists
+
+- name: Install Zabbix Release package
+  apt:
+    deb: /tmp/zabbix-release_6.4-1+ubuntu20.04_all.deb
+    state: present
+
+- name: Update package cache
+  apt:
+    update_cache: yes
+
+- name: Install Zabbix Agent
+  apt:
+    name: zabbix-agent2
+    state: present
+
+- name: Start Zabbix Agent
+  service:
+    name: zabbix-agent2
+    state: started
+    enabled: yes
+
+- name: Add PSK key to zabbix_agentd.psk file
+  lineinfile:
+    path: /etc/zabbix/zabbix_agentd.psk
+    line: "{{ PSK }}"
+    create: yes
+
+- name: Gather facts
+  setup:
+
+- name: Update Zabbix Agent configuration
+  lineinfile:
+    path: /etc/zabbix/zabbix_agent2.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.replace }}"
+  loop:
+    - { regexp: "^Server=127.0.0.1", replace: "Server={{ server }}" }
+    - {
+        regexp: "^ServerActive=127.0.0.1",
+        replace: "ServerActive={{ server }}",
+      }
+    - { regexp: "^Hostname=", replace: "Hostname={{ ansible_hostname }}" }
+
+- name: Add TLS configuration to Zabbix Agent
+  blockinfile:
+    path: /etc/zabbix/zabbix_agent2.conf
+    block: |
+      TLSConnect=psk
+      TLSAccept=psk
+      TLSPSKIdentity=vmterraform
+      TLSPSKFile=/etc/zabbix/zabbix_agentd.psk
+
+- name: Restart Zabbix Agent
+  service:
+    name: zabbix-agent2
+    state: restarted
+
+- name: Enable UFW and allow Zabbix Agent port
+  ufw:
+    rule: allow
+    port: "10050"
+    proto: tcp
+    from_ip: "{{ server }}"
+    state: enabled

@@ -1,0 +1,44 @@
+- name: Create JWT token
+  shell: >
+    curl -X POST -k -H "Content-Type: application/json" -d '{"Username":"{{ user }}","Password":"{{ password }}"}' https://"{{ portainer_server }}"/api/auth
+  register: response
+
+- name: set JWT token var
+  set_fact:
+    jwt_token: "{{ response.stdout | from_json | json_query('jwt') }}"
+
+- name: Create Environment in Portainer
+  shell: >
+    curl -X POST -k -H "Authorization: {{ jwt_token }}"
+    -F "Name=VM Terraform {{ item }} ip {{ hostvars[item].ansible_host }}"
+    -F "URL=tcp://{{ hostvars[item].ansible_host }}:{{ ansible_docker_port }}"
+    -F "EndpointCreationType=1"
+    -F "TLS=true"
+    -F "TLSCACertFile=@/home/{{ user }}/docker_cert/{{ hostvars[item].ansible_host }}/ca.pem"
+    -F "TLSCertFile=@/home/{{ user }}/docker_cert/{{ hostvars[item].ansible_host }}/cert.pem"
+    -F "TLSKeyFile=@/home/{{ user }}/docker_cert/{{ hostvars[item].ansible_host }}/key.pem"
+    https://"{{ portainer_server }}"/api/endpoints
+  register: response
+  loop: "{{ groups[host_group_name] }}"
+  ignore_errors: true
+
+- name: Generate id values list
+  set_fact:
+    id_list: "{{ response.results | selectattr('item', 'in', groups[host_group_name]) | map(attribute='stdout') | map('from_json') | map('json_query', 'Id') | list }}"
+  ignore_errors: true
+
+- name: Write id_list to file
+  copy:
+    content: |
+      id:
+      {% for id_value in id_list %}
+      - {{ id_value }}
+      {% endfor %}
+    dest: "{{ role_path }}/vars/main.yml"
+  ignore_errors: true
+
+- name: Add host group variable to vars file
+  lineinfile:
+    path: "{{ role_path }}/vars/main.yml"
+    line: "host_group: {{ host_group_name }}"
+    state: present

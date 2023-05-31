@@ -1,0 +1,14 @@
+Protocol 2
+Include /etc/ssh/sshd_config.d/*.conf
+LoginGraceTime 2m
+PermitRootLogin no
+Port {{ ssh_port }}
+MaxSessions 4
+MaxAuthTries 5
+PubkeyAuthentication yes
+PasswordAuthentication no
+PermitEmptyPasswords no
+ChallengeResponseAuthentication no
+UsePAM yes
+X11Forwarding yes
+PrintMotd no
