@@ -31,12 +31,14 @@
     - name: Get IP addresses from hosts group
       set_fact:
         hosts: "{{ groups[host_group] }}"
+      ignore_errors: yes
 
     - name: Include id variables
       include_vars:
         file: "{{ playbook_dir }}/add_environments/vars/main.yml"
       loop_control:
         loop_var: id_var
+      ignore_errors: yes
 
     - name: Delete Environment in Portainer
       shell: >
@@ -48,6 +50,7 @@
       shell: "rm -rf /home/{{ user }}/docker_cert/{{ hostvars[item].ansible_host }}"
       loop: "{{ groups[host_group] }}"
       when: item in hostvars
+      ignore_errors: yes
 
     - name: Login to Zabbix server web
       uri:
@@ -82,6 +85,7 @@
           auth: "{{ zabbix_login.json.result }}"
           id: "2"
       register: get_response
+      ignore_errors: yes
 
     - name: Delete dashboard by ID
       uri:
@@ -97,6 +101,7 @@
           auth: "{{ zabbix_login.json.result }}"
           id: "3"
       register: delete_response
+      ignore_errors: yes
 
     - name: Get host IDs
       uri:
