@@ -2,7 +2,7 @@ This script starts the process of creating a server on the Hetzner cloud using t
 The roles include :
 - creating a new user with ssh_key authorization , password and root login authorization disabled
 - Install docker and protect daemon socket with tls certificates.
-- Installation of the zabbix agent 6.4 , including automatic connection to the server via tls PSK
+- Installation of the zabbix agent 6.4 , including auto connection to the server via tls PSK
 -  creating a dashboard on the zabbix server with graphs by your project name
 - adding to the Portainer server environment with the project name by TLS certs
 - and also include rules in ufw , adding ip addresses to the white list for zabbix and zabbix agetn ports
